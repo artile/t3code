@@ -1,3 +1,4 @@
+import { randomUUID } from "../lib/utils";
 import {
   type EnvironmentThreadShell,
   type PendingSubagentRequest,
@@ -179,6 +180,19 @@ export function startThreadNotifications(
             void router.navigate({
               to: "/$environmentId/$threadId",
               params: { environmentId, threadId: thread.id },
+              ...(kind === "completion" && thread.latestRun
+                ? {
+                    resetScroll: false,
+                    state: {
+                      notifiedReply: {
+                        environmentId,
+                        threadId: thread.id,
+                        runId: thread.latestRun.runId,
+                        key: randomUUID(),
+                      },
+                    },
+                  }
+                : {}),
             });
           },
         },
@@ -209,6 +223,19 @@ export function startThreadNotifications(
         void router.navigate({
           to: "/$environmentId/$threadId",
           params: { environmentId, threadId: thread.id },
+          ...(kind === "completion" && thread.latestRun
+            ? {
+                resetScroll: false,
+                state: {
+                  notifiedReply: {
+                    environmentId,
+                    threadId: thread.id,
+                    runId: thread.latestRun.runId,
+                    key: randomUUID(),
+                  },
+                },
+              }
+            : {}),
         });
       });
     } catch {

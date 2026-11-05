@@ -1,3 +1,4 @@
+import { useClientSettings } from "../../hooks/useSettings";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { type MessageId, type RunId } from "@t3tools/contracts";
 import { CHAT_LIST_ANCHOR_OFFSET } from "@t3tools/shared/chatList";
@@ -166,6 +167,7 @@ interface TimelineFollowInput {
  * ChatView unless the follow mode flips.
  */
 export function useTimelineFollow(input: TimelineFollowInput) {
+  const autoScroll = useClientSettings((settings) => settings.chatAutoScrollEnabled);
   const {
     legendListRef,
     composerTimelineInset,
@@ -208,7 +210,7 @@ export function useTimelineFollow(input: TimelineFollowInput) {
   const followSnapshot = useSyncExternalStore(followStore.subscribe, followStore.snapshot);
   const follow =
     followSnapshot.visit === visit ? followSnapshot.follow : initialTimelineFollow(visit.followEnd);
-  const timelineLiveFollowEnabled = follow.mode === "following";
+  const timelineLiveFollowEnabled = autoScroll && follow.mode === "following";
   const readFollow = () => followStore.read(visit);
   // Async settles outlive their render; this reads the visit shown now.
   const readCurrentFollow = useStableCallback(readFollow);
@@ -334,17 +336,24 @@ export function useTimelineFollow(input: TimelineFollowInput) {
     requestAnimationFrame(() => {
       const list = legendListRef.current;
       if (!list) return;
-      void Promise.resolve(
-        list.scrollToEnd?.({
-          animated: animated && !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        }),
-      ).then(() =>
-        settleListScroll(
+      const dataAtJump = list.getState().data;
+      const node = list.getScrollableNode();
+      const scrolling = autoScroll
+        ? list.scrollToEnd({
+            animated: animated && !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+          })
+        : list.scrollToOffset({ offset: node ? measuredEndOffset(node) : 0, animated: false });
+      void Promise.resolve(scrolling).then(() => {
+        if (legendListRef.current !== list) return;
+        return settleListScroll(
           list,
-          measuredEndOffset,
+          (element) =>
+            autoScroll || list.getState().data === dataAtJump
+              ? measuredEndOffset(element)
+              : undefined,
           () => readCurrentFollow().mode !== "following" || legendListRef.current !== list,
-        ),
-      );
+        );
+      });
     });
   };
   const scrollToEndStable = useStableCallback(scrollToEnd);
@@ -355,8 +364,8 @@ export function useTimelineFollow(input: TimelineFollowInput) {
   useLayoutEffect(() => {
     const grew = composerTimelineInset > followedInsetRef.current;
     followedInsetRef.current = composerTimelineInset;
-    if (grew && readCurrentFollow().mode === "following") scrollToEndStable();
-  }, [composerTimelineInset, readCurrentFollow, scrollToEndStable]);
+    if (autoScroll && grew && readCurrentFollow().mode === "following") scrollToEndStable();
+  }, [autoScroll, composerTimelineInset, readCurrentFollow, scrollToEndStable]);
 
   const handleNavigation = (navigation: TimelineNavigation) => {
     const awayFromEnd = () => resolveTimelineIsAtEnd(legendListRef.current?.getState()) === false;
@@ -483,11 +492,15 @@ export function useTimelineFollow(input: TimelineFollowInput) {
   // The list ignores footer layout, so a new queued turn or status line there would land
   // under the composer. Follow it when the reader was following the end.
   const onTimelineFooterGrow = () => {
-    if (readFollow().mode === "following") scrollToEndStable();
+    if (autoScroll && readFollow().mode === "following") scrollToEndStable();
   };
   const onTimelineFooterGrowStable = useStableCallback(onTimelineFooterGrow);
 
   const onIsAtEndChange = (isAtEnd: boolean) => {
+    if (!autoScroll) {
+      setShowScrollToBottom(!isAtEnd);
+      return;
+    }
     const scroll = visitScroll();
     if (!isAtEnd && readFollow().mode === "following") {
       scroll.showScrollDebouncer.cancel();
@@ -544,6 +557,7 @@ export function useTimelineFollow(input: TimelineFollowInput) {
 
   /** Arms the anchor for a message the user just sent, before its run exists. */
   const anchorNewTurn = (threadKey: string, messageId: MessageId) => {
+    if (!autoScroll) return;
     followStore.dispatch(visit, { type: "followEnd" });
     visitScroll().showScrollDebouncer.cancel();
     setShowScrollToBottom(false);

@@ -1,3 +1,8 @@
+import {
+  useReplyReading,
+  ReplyReadingMarkerContext,
+  type ReplyReadingRequest,
+} from "./useReplyReading";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
@@ -217,6 +222,7 @@ interface MessagesTimelineProps {
   respondingRequestIds?: TimelineRowSharedState["respondingRequestIds"];
   canOperateThread?: boolean;
   onRespondToApproval?: TimelineRowSharedState["onRespondToApproval"];
+  replyReadingRequest?: ReplyReadingRequest | null;
   citationRequest?: AssistantCitationRequest | null;
   citationHistory?: CitedHistory;
   onCiteAssistantText?: (
@@ -333,6 +339,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   respondingRequestIds = EMPTY_RESPONDING_REQUEST_IDS,
   canOperateThread = false,
   onRespondToApproval,
+  replyReadingRequest = null,
   citationRequest = null,
   citationHistory = CITED_HISTORY_LOADING,
   onCiteAssistantText,
@@ -597,6 +604,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
   // the user can fold it again. Only a citation that can still land opens one.
   // The marker stops the O(entries) fold lookup once the entry is found, since
   // the href stays in the URL after the citation settles.
+  const [replyExpandedFor, setReplyExpandedFor] = useState<string | null>(null);
+  if (replyReadingRequest && replyExpandedFor !== replyReadingRequest.key) {
+    setReplyExpandedFor(replyReadingRequest.key);
+    setExpandedRunIds((previous) => new Set(previous).add(replyReadingRequest.runId));
+  }
   const [citationExpandedFor, setCitationExpandedFor] = useState<string | null>(null);
   // Back/Forward can restore an earlier activation key, so the marker clears
   // between activations and a revisit opens the fold again.
@@ -718,6 +730,16 @@ const ConversationTimeline = memo(function ConversationTimeline({
   if (nextOpening !== listOpening) setListOpening(nextOpening);
   const listOpenedOn = nextOpening.mounted ? nextOpening.identity : null;
   const viewportRef = useRef<TimelineViewport | null>(null);
+  const [findListReady, setFindListReady] = useState(false);
+  const replyReading = useReplyReading({
+    identity: listIdentityKey,
+    request: replyReadingRequest,
+    rows,
+    entries: timelineEntries,
+    listRef,
+    viewport: viewportRef,
+    listReady: findListReady,
+  });
   const navigateTimeline = () => viewportRef.current?.navigate({ releasesFollow: true });
   const restoreReady = restoringThreadPosition && rows.length > 0;
   // Z: syncs LegendList's scroll position with which thread it shows. The list
@@ -736,12 +758,13 @@ const ConversationTimeline = memo(function ConversationTimeline({
       listIdentityKey,
       listOpenedOn,
       rememberedPosition,
-      citationPending: citationRequest !== null,
+      citationPending: citationRequest !== null || replyReading.positioning,
       releaseForFind: findOpenAtOpening,
       onPositioned: setPositionedThreadKey,
     });
   }, [
     citationRequest,
+    replyReading.positioning,
     findOpenAtOpening,
     listIdentityKey,
     listOpenedOn,
@@ -772,7 +795,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
     viewport: timelineViewportElement,
     onManualNavigation: navigateTimeline,
   });
-  const [findListReady, setFindListReady] = useState(false);
   const handleListLoad = () => {
     onCitationListLoad();
     setFindListReady(true);
@@ -792,6 +814,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     ...(firstMessageRow ? [firstMessageRow.id] : []),
     ...(lastMessageRow && lastMessageRow !== firstMessageRow ? [lastMessageRow.id] : []),
     ...(citationAlwaysRender?.keys ?? []),
+    ...(replyReading.targetId ? [replyReading.targetId] : []),
     ...(fullscreenAppRowId === null ? [] : [fullscreenAppRowId]),
     ...new Set(
       [...playingAudioRows].filter(([audio]) => audio.isConnected).map(([, rowId]) => rowId),
@@ -818,8 +841,14 @@ const ConversationTimeline = memo(function ConversationTimeline({
   };
   const anchoredEndSpaceConfig = resolveChatListAnchoredEndSpace(
     rows,
-    anchorMessageId,
-    (row) => (row.kind === "message" && row.message.role === "user" ? row.message.id : null),
+    anchorMessageId ?? replyReading.anchorMessageId,
+    (row) =>
+      row.kind === "message" &&
+      (anchorMessageId !== null
+        ? row.message.role === "user"
+        : row.message.id === replyReading.anchorMessageId)
+        ? row.message.id
+        : null,
     { anchorOffset: CHAT_TIMELINE_ANCHOR_OFFSET },
   );
   const anchoredEndSpace = anchoredEndSpaceConfig
@@ -1218,26 +1247,33 @@ const ConversationTimeline = memo(function ConversationTimeline({
     });
   });
   const renderItem = ({ item }: { item: MessagesTimelineRow }) => (
-    <TimelineRowCtx value={sharedState}>
-      <div
-        className="messages-timeline-row-frame"
-        onPlayCapture={(event) => onAudioPlaybackChange(item.id, event)}
-        onPauseCapture={(event) => onAudioPlaybackChange(item.id, event)}
-        onEndedCapture={(event) => onAudioPlaybackChange(item.id, event)}
-      >
+    <ReplyReadingMarkerContext value={replyReading.markerId}>
+      <TimelineRowCtx value={sharedState}>
         <div
-          ref={observeLaneWidth}
-          className="chat-content-lane overflow-x-clip"
-          data-timeline-root="true"
+          className="messages-timeline-row-frame"
+          onPlayCapture={(event) => onAudioPlaybackChange(item.id, event)}
+          onPauseCapture={(event) => onAudioPlaybackChange(item.id, event)}
+          onEndedCapture={(event) => onAudioPlaybackChange(item.id, event)}
         >
-          <AudioPreviewUnmountContext value={onAudioUnmount}>
-            <TimelineRowContent row={item} />
-          </AudioPreviewUnmountContext>
+          <div
+            ref={observeLaneWidth}
+            className="chat-content-lane overflow-x-clip"
+            data-timeline-root="true"
+          >
+            <AudioPreviewUnmountContext value={onAudioUnmount}>
+              <TimelineRowContent row={item} />
+            </AudioPreviewUnmountContext>
+          </div>
         </div>
-      </div>
-    </TimelineRowCtx>
+      </TimelineRowCtx>
+    </ReplyReadingMarkerContext>
   );
-  const listExtraData = { identity: listIdentityKey, rowCount: rows.length, sharedState };
+  const listExtraData = {
+    identity: listIdentityKey,
+    rowCount: rows.length,
+    replyMarker: replyReading.markerId,
+    sharedState,
+  };
   const timelineListFooter = (
     <TimelineListFooter
       composerInset={anchoredEndSpace ? 0 : contentInsetEndAdjustment}
@@ -1313,7 +1349,10 @@ const ConversationTimeline = memo(function ConversationTimeline({
               renderItem={renderItem}
               estimatedItemSize={90}
               initialScrollAtEnd={
-                !findActive && citationRequest === null && rememberedPosition?.atEnd !== false
+                !findActive &&
+                citationRequest === null &&
+                !replyReading.positioning &&
+                rememberedPosition?.atEnd !== false
               }
               // Legend needs a data refresh to mount new pins without a scroll event.
               dataVersion={`${readyCitationRequest?.key ?? listIdentityKey}:${alwaysRenderKeys.join(",")}`}
@@ -1322,6 +1361,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               {...(anchoredEndSpace ? { anchoredEndSpace } : {})}
               contentInsetEndAdjustment={anchoredEndSpace ? contentInsetEndAdjustment : 0}
               maintainScrollAtEnd={
+                replyReading.positioning ||
                 citationPositioning ||
                 (restoringThreadPosition && rememberedPosition?.atEnd === false) ||
                 anchoredEndSpace ||
@@ -1335,6 +1375,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               }
               maintainVisibleContentPosition={
                 findActive ||
+                replyReading.positioning ||
                 citationPositioning ||
                 (restoringThreadPosition && rememberedPosition?.atEnd === false)
                   ? false
@@ -1343,6 +1384,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               maintainScrollAtEndThreshold={1}
               onScroll={handleScroll}
               onItemSizeChanged={handleItemSizeChanged}
+              style={replyReading.positioning ? { visibility: "hidden" } : {}}
               className={cn(
                 "messages-timeline-scroll scrollbar-gutter-both h-full min-h-0 overflow-x-hidden overscroll-y-contain [overflow-anchor:none]",
                 topFadeEnabled && "topbar-scroll-fade",

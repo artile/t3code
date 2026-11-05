@@ -75,11 +75,6 @@ describe("HTML selection Cite toolbar", () => {
         },
       },
     });
-    await act(() =>
-      document
-        .querySelector<HTMLButtonElement>('[aria-label="Cite selection in composer"]')!
-        .click(),
-    );
     expect(onCite.mock.calls[0]?.[0]).toEqual({
       version: 1,
       environmentId: "env",
@@ -89,18 +84,12 @@ describe("HTML selection Cite toolbar", () => {
     });
   });
 
-  it("adds the iframe quote to the composer with a source anchor in client coordinates", async () => {
+  it("opens the iframe quote comment without a Cite click and keeps the source anchor", async () => {
     await using fixture = await setup();
     const { frame, onCite, quote, send } = fixture;
     const post = vi.spyOn(frame.contentWindow!, "postMessage");
     await send();
-    const button = document.querySelector<HTMLButtonElement>(
-      '[aria-label="Cite selection in composer"]',
-    )!;
-    expect(button).not.toBeNull();
-    expect(button.style.left).toBe("190px");
-    expect(button.style.top).toBe("79px");
-    await act(() => button.click());
+    expect(document.querySelector('[aria-label="Cite selection in composer"]')).toBeNull();
     expect(onCite).toHaveBeenCalledOnce();
     const [citation, anchor] = onCite.mock.calls[0]!;
     expect(citation).toEqual({

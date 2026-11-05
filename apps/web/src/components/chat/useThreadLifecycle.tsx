@@ -1,3 +1,4 @@
+import { getClientSettings } from "../../hooks/useSettings";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type { Dispatch } from "react";
@@ -526,7 +527,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         streaming: false,
       },
     ]);
-    scrollToEnd();
+    if (getClientSettings().chatAutoScrollEnabled) scrollToEnd();
     // Commands settle into a result, so this always runs.
     const settingsResult = await persistThreadSettingsForNextTurn({
       threadId,

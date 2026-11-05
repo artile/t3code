@@ -252,6 +252,25 @@ it("presents completion notifications and sound as soon as the shell completes",
   );
   expect(TestNotification.sent.map((sent) => sent.title)).toEqual(["Thread completed"]);
   expect(state.sound).toHaveBeenCalledWith("completion", expect.any(Function));
+  const completed = TestNotification.sent[0]!;
+  state.shells.set(
+    "one",
+    shell({ latestTurn: { turnId: "later-turn", state: "running", completedAt: null } }),
+  );
+  completed.dispatchEvent(new Event("click"));
+  expect(state.navigate).toHaveBeenLastCalledWith({
+    to: "/$environmentId/$threadId",
+    params: { environmentId: "one", threadId: "thread" },
+    resetScroll: false,
+    state: {
+      notifiedReply: {
+        environmentId: "one",
+        threadId: "thread",
+        runId: "turn",
+        key: expect.any(String),
+      },
+    },
+  });
 });
 
 it.each(["hasPendingApprovals", "hasPendingUserInput"] as const)(

@@ -25,8 +25,8 @@ function Timeline({ onCite }: { onCite: (citation: AssistantCitation) => boolean
 }
 
 describe("AssistantSelectionToolbar", () => {
-  it("does not cite when the user clicks just past where a double-click selection ended", async () => {
-    const onCite = vi.fn((_citation: AssistantCitation) => true);
+  it("offers a retry outside the selection when the composer cannot accept the quote", async () => {
+    const onCite = vi.fn((_citation: AssistantCitation) => false);
     await using screen = await render(<Timeline onCite={onCite} />);
     const word = screen.getByText("keepers");
     const { width, height } = word.element().getBoundingClientRect();
@@ -42,6 +42,6 @@ describe("AssistantSelectionToolbar", () => {
       position: { x: released.x + 5, y: released.y + 5 },
       force: true,
     });
-    expect(onCite.mock.calls.map(([citation]) => citation.text)).toEqual([]);
+    expect(onCite.mock.calls.map(([citation]) => citation.text)).toEqual(["keepers"]);
   });
 });
