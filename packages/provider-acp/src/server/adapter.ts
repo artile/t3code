@@ -482,6 +482,9 @@ export interface AcpAdapterV2Flavor {
   readonly extractSubagentSessionEvent?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => AcpSubagentSessionEvent | undefined;
+  readonly extractSubagentUpdates?: (
+    toolCall: AcpToolCallState,
+  ) => ReadonlyArray<AcpAdapterV2SubagentUpdate>;
   readonly extractSubagentUpdate?: (
     toolCall: AcpToolCallState,
   ) => AcpAdapterV2SubagentUpdate | undefined;
@@ -3944,7 +3947,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             ? undefined
             : extractSubagentUpdate(toolCall);
           if (subagentUpdate !== undefined) {
-            yield* emitSubagent(context, subagentUpdate);
+            const updates = flavor.extractSubagentUpdates?.(toolCall) ?? [subagentUpdate];
+            for (const update of updates) yield* emitSubagent(context, update);
             if (followsAgentWorkState) yield* syncNativeChildren(context);
             if (subagentUpdate.suppressNormalTool !== false) {
               yield* rearmDeferredFinalize(context);

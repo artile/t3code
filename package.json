@@ -54,7 +54,11 @@
     "dist:desktop:win:x64": "node scripts/build-desktop-artifact.ts --platform win --target nsis --arch x64",
     "release:smoke": "node scripts/release-smoke.ts",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist apps/*/dist-electron packages/*/dist .vite-plus apps/*/.vite-plus packages/*/.vite-plus",
-    "sync:repos": "node scripts/sync-reference-repos.ts"
+    "sync:repos": "node scripts/sync-reference-repos.ts",
+    "fork:update": "node scripts/omp-fork-update.mjs",
+    "fork:dev": "node scripts/omp-fork-dev.mjs",
+    "fork:build": "vp run --filter t3 build:bundle && vp run --filter @t3tools/web build && node scripts/omp-fork-package.mjs",
+    "fork:start": "node scripts/omp-fork-start.mjs"
   },
   "devDependencies": {
     "@coderabbitai/config": "1.1.0",
