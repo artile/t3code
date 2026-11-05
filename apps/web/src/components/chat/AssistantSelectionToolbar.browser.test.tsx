@@ -10,6 +10,7 @@ async function setup() {
   source.dataset.assistantCitationSource = "render-tool-item";
   const frame = document.createElement("iframe");
   frame.dataset.htmlSelectionBridge = "true";
+  frame.style.cssText = "width:400px;height:300px;border:0";
   source.append(frame);
   viewport.append(source);
   const mount = document.createElement("div");
@@ -97,8 +98,8 @@ describe("HTML selection Cite toolbar", () => {
       '[aria-label="Cite selection in composer"]',
     )!;
     expect(button).not.toBeNull();
-    expect(button.style.left).toBe("170px");
-    expect(button.style.top).toBe("75px");
+    expect(button.style.left).toBe("190px");
+    expect(button.style.top).toBe("79px");
     await act(() => button.click());
     expect(onCite).toHaveBeenCalledOnce();
     const [citation, anchor] = onCite.mock.calls[0]!;

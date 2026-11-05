@@ -237,9 +237,7 @@ export function AssistantSelectionToolbar({
         position: resolveSelectionActionPosition({
           bounds,
           selectionRect: rect,
-          pointer: captured?.pointer
-            ? { x: frameBounds.left + captured.pointer.x, y: frameBounds.top + captured.pointer.y }
-            : null,
+          pointer: null,
           viewport: { width: window.innerWidth, height: window.innerHeight },
         }),
       });
