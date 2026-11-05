@@ -21,6 +21,7 @@ import type { ProviderDriver } from "@t3tools/provider-core/server/driver";
 import { ProviderAdapterDriverCreateError } from "@t3tools/provider-core/server/adapterDriver";
 import { OmpSettings } from "../settings.ts";
 import { extractOmpSubagentUpdates } from "./subagents.ts";
+import { normalizeOmpToolCall } from "./toolCalls.ts";
 import { AcpProviderCapabilitiesV2 } from "@t3tools/provider-acp/server/adapter";
 
 const OMP = ProviderDriverKind.make("omp");
@@ -53,6 +54,7 @@ const createAdapter: typeof AcpRegistryAdapterV2Driver.create = Effect.fn("OmpAd
         commandArgs: ompApprovalArgs(policy.runtimeMode),
       }),
       nativeFlavor: {
+        normalizeToolCall: normalizeOmpToolCall,
         capabilities: {
           ...AcpProviderCapabilitiesV2,
           subagents: {
