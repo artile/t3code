@@ -567,6 +567,11 @@ export default function ChatView(props: ChatViewProps) {
   // Selects primitives: an object here is new on every router store update, which
   // re-renders ChatView on unrelated navigation state changes.
   const citationHref = useLocation({ select: (location) => location.href });
+  const notifiedReply = useLocation({ select: (location) => location.state.notifiedReply });
+  const replyReadingRequest =
+    notifiedReply?.environmentId === environmentId && notifiedReply.threadId === threadId
+      ? notifiedReply
+      : null;
   const citationKey = useLocation({
     select: (location) => location.state.assistantCitationActivation ?? location.state.__TSR_key,
   });
@@ -2732,6 +2737,7 @@ export default function ChatView(props: ChatViewProps) {
         routeKind !== "draft" &&
         composerRef.current?.isCaretAtStart() === true &&
         queuedRunsControlRef.current?.editLatest(event.repeat) === true,
+      "thread.scrollToEnd": () => scrollToEnd(false),
       "thread.stop": ({ event }) => {
         if (!canInterruptRunningThread) return false;
         if (!event.repeat) void onInterruptStable();
@@ -3386,6 +3392,7 @@ export default function ChatView(props: ChatViewProps) {
                   activeThreadKey={activeThreadKey}
                   syncing={threadSyncPhase !== null}
                   detailLoading={threadDetailLoading}
+                  replyReadingRequest={replyReadingRequest}
                   citationRequest={citationRequest}
                   citationHistory={citationHistory}
                   onCiteAssistantText={citeAssistantTextStable}

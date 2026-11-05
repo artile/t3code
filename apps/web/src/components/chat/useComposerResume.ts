@@ -1,3 +1,4 @@
+import { getClientSettings } from "../../hooks/useSettings";
 import {
   type EnvironmentId,
   type ProviderInteractionMode,
@@ -151,7 +152,11 @@ export function useComposerResume(input: ComposerResumeInput) {
       }
     } else {
       clearUsageLimitsFor(routeThreadKey);
-      if (currentRouteThreadKeyRef.current === routeThreadKey) scrollToEnd();
+      if (
+        getClientSettings().chatAutoScrollEnabled &&
+        currentRouteThreadKeyRef.current === routeThreadKey
+      )
+        scrollToEnd();
     }
     sendInFlightRef.current = false;
     setResumingThreadKeys((current) => {

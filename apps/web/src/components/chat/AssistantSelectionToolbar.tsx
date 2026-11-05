@@ -1,3 +1,4 @@
+import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   ASSISTANT_CITATION_MAX_TEXT_LENGTH,
   MessageId,
@@ -45,6 +46,19 @@ export function AssistantSelectionToolbar({
   const toolbarRef = useRef<HTMLButtonElement>(null);
   const actionsRef = useRef<ReturnType<typeof observeSelectionActions> | null>(null);
   const backgroundThread = use(BackgroundThreadContext);
+  const offerSelection = useStableCallback((next: NonNullable<typeof selection>) => {
+    if (
+      !backgroundThread &&
+      !next.tooLong &&
+      next.citation.text.length <= ASSISTANT_CITATION_MAX_TEXT_LENGTH &&
+      onCite(next.citation, next.sourceAnchor)
+    ) {
+      if (next.sourceAnchor.htmlRender) htmlSelectionCommand(next.sourceAnchor.htmlRender, "clear");
+      else window.getSelection()?.removeAllRanges();
+      actionsRef.current?.cancel();
+      setSelection(null);
+    } else setSelection(next);
+  });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the toolbar DOM node and clamps its position inside the window before paint
   useLayoutEffect(() => {
@@ -120,7 +134,7 @@ export function AssistantSelectionToolbar({
         return;
       }
       const rects = captured.range.getClientRects();
-      setSelection({
+      offerSelection({
         sourceAnchor: { source: captured.source, range: captured.range, viewport },
         citation: {
           version: 1,
@@ -212,7 +226,7 @@ export function AssistantSelectionToolbar({
       const selector = captured?.selector ?? { text: "", start: 0, end: 1, prefix: "", suffix: "" };
       let currentRect = localRect;
       const sourceRect = () => htmlSelectionClientRect(frame, currentRect);
-      setSelection({
+      offerSelection({
         tooLong: params.tooLong === true,
         citation: { version: 1, ...threadRef, messageId: MessageId.make(messageId), ...selector },
         sourceAnchor: {
@@ -250,7 +264,7 @@ export function AssistantSelectionToolbar({
       actions.dispose();
       actionsRef.current = null;
     };
-  }, [backgroundThread, threadRef, viewport]);
+  }, [backgroundThread, threadRef, viewport, offerSelection]);
 
   if (!selection) return null;
   const tooLong =

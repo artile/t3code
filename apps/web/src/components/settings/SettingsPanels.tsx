@@ -459,6 +459,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme
       ? ["Diff colors"]
       : []),
+    ...(settings.chatAutoScrollEnabled !== DEFAULT_UNIFIED_SETTINGS.chatAutoScrollEnabled
+      ? ["Automatic scrolling"]
+      : []),
     ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["Chat width"] : []),
     ...(settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay
       ? ["Effort display"]
@@ -637,6 +640,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     updateSettings({
       appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
       diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme,
+      chatAutoScrollEnabled: DEFAULT_UNIFIED_SETTINGS.chatAutoScrollEnabled,
       chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth,
       effortDisplay: DEFAULT_UNIFIED_SETTINGS.effortDisplay,
       mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
@@ -1060,6 +1064,21 @@ export function ChatSettingsPanel() {
 
   return (
     <SettingsPageContainer>
+      <SettingsSection id="reading" title="Reading">
+        <SettingsRow
+          {...searchableSetting("chat-auto-scroll")}
+          description="Follow new messages and move to prompts when you send. Turn off to keep your reading position; use Command/Ctrl+Down to jump to the end."
+          control={
+            <Switch
+              checked={settings.chatAutoScrollEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ chatAutoScrollEnabled: Boolean(checked) })
+              }
+              aria-label="Automatic scrolling"
+            />
+          }
+        />
+      </SettingsSection>
       <SettingsSection id="composer" title="Composer">
         <SettingsRow
           {...searchableSetting("composer-rich-text")}

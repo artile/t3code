@@ -1,3 +1,4 @@
+import { ReplyReadingMarkerContext } from "./useReplyReading";
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
 import { MessageId, type RunId } from "@t3tools/contracts";
 import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
@@ -26,6 +27,7 @@ import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts"
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
+  const readingMarker = use(ReplyReadingMarkerContext);
   // The timeline holds a streaming message's row while only its text grows.
   const liveText = useAssistantMessageText(
     row.message.streaming ? ctx.threadRef : null,
@@ -38,7 +40,20 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
     <>
       <div className="relative min-w-0 px-1 py-0.5">
         <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
-        <div data-thread-find-text="true">
+        <div
+          data-thread-find-text="true"
+          className={cn("relative", readingMarker === row.message.id && "ms-4")}
+        >
+          {readingMarker === row.message.id ? (
+            <span
+              data-reply-reading-marker="true"
+              role="img"
+              aria-label="Start of notified reply"
+              className="absolute -left-4 top-0 text-primary"
+            >
+              →
+            </span>
+          ) : null}
           <AssistantCitationSource
             messageId={row.message.id}
             {...(ctx.threadRef ? { threadRef: ctx.threadRef } : {})}

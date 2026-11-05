@@ -35,6 +35,7 @@ import { environmentThreadDetails } from "../../state/threads";
 import { act, fakeTimers, render, stubGlobal } from "../../../test/render";
 import { ChangedFilesCard } from "./ChangedFilesTree";
 import { MessagesTimeline } from "./MessagesTimeline";
+import { useTimelineFollow } from "./useTimelineFollow";
 import { makeStreamingTimelineFixture } from "../../test-fixtures";
 import {
   type PendingApproval,
@@ -1752,3 +1753,190 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     .element(screen.getByRole("button", { name: "Open the current tab", exact: true }))
     .toBeVisible();
 });
+
+function ReadingTimeline({
+  base,
+  entries,
+}: {
+  base: ReturnType<typeof baseProps>;
+  entries: ReadonlyArray<Entry>;
+}) {
+  const [anchor, setAnchor] = useState<{ threadKey: string | null; messageId: MessageId | null }>({
+    threadKey: null,
+    messageId: null,
+  });
+  const follow = useTimelineFollow({
+    legendListRef: base.listRef,
+    composerTimelineInset: 0,
+    routeThreadKey: base.routeThreadKey,
+    activeThreadKey: base.routeThreadKey,
+    isServerThread: false,
+    serverProjection: null,
+    threadStatus: "live",
+    activeActivityRun: null,
+    activeRunningTurnId: null,
+    timelineEntries: entries,
+    timelineAnchorMessageId: anchor.messageId,
+    setTimelineAnchor: setAnchor,
+  });
+  return (
+    <>
+      <button
+        onClick={() => follow.anchorNewTurn(base.routeThreadKey, MessageId.make("new-prompt"))}
+      >
+        Send test prompt
+      </button>
+      <button onClick={() => follow.scrollToEnd(false)}>Jump to end</button>
+      <MessagesTimeline
+        {...base}
+        timelineEntries={entries}
+        liveFollowEnabled={follow.timelineLiveFollowEnabled}
+        anchorMessageId={anchor.messageId}
+        onViewportAttach={follow.attachTimelineViewport}
+        onIsAtEndChange={follow.onIsAtEndChangeStable}
+        onFooterGrow={follow.onTimelineFooterGrowStable}
+        onAnchorReady={follow.onTimelineAnchorReadyStable}
+        onAnchorSizeChanged={follow.onTimelineAnchorSizeChangedStable}
+      />
+    </>
+  );
+}
+
+it.each(["end", "history"])(
+  "keeps the reading position at %s through send and streaming, including after an explicit end jump",
+  async (start) => {
+    setup();
+    const base = baseProps();
+    const entries = Array.from({ length: 25 }, (_, i) =>
+      message(
+        `Reply ${i}\n\n${"reading line\n\n".repeat(12)}`,
+        { role: "assistant" },
+        `reading-${i}`,
+      ),
+    );
+    await using screen = await renderElement(<ReadingTimeline base={base} entries={entries} />);
+    const viewport = base.listRef.current!.getScrollableNode()!;
+    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(500));
+    if (start === "history")
+      await act(() => base.listRef.current!.scrollToIndex({ index: 8, animated: false }));
+    const before = viewport.scrollTop;
+    await click(screen.button("Send test prompt"));
+    const sent = [...entries, message("New prompt", { role: "user" }, "new-prompt")];
+    await screen.rerender(<ReadingTimeline base={base} entries={sent} />);
+    const streaming = [
+      ...sent,
+      message(
+        "Streaming answer\n\n".repeat(30),
+        { role: "assistant", streaming: true },
+        "new-answer",
+      ),
+    ];
+    await screen.rerender(<ReadingTimeline base={base} entries={streaming} />);
+    await vi.waitFor(() =>
+      expect(base.listRef.current!.getState().data.length).toBeGreaterThan(25),
+    );
+    expect(Math.abs(viewport.scrollTop - before)).toBeLessThanOrEqual(2);
+    await click(screen.button("Jump to end"));
+    await vi.waitFor(() =>
+      expect(
+        Math.abs(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop),
+      ).toBeLessThanOrEqual(2),
+    );
+    const end = viewport.scrollTop;
+    const more = [
+      ...sent,
+      message(
+        "Streaming answer\n\n".repeat(70),
+        { role: "assistant", streaming: true },
+        "new-answer",
+      ),
+    ];
+    await screen.rerender(<ReadingTimeline base={base} entries={more} />);
+    await vi.waitFor(() =>
+      expect(viewport.scrollHeight - viewport.clientHeight).toBeGreaterThan(end + 100),
+    );
+    expect(Math.abs(viewport.scrollTop - end)).toBeLessThanOrEqual(2);
+  },
+);
+
+it.each(["short", "long"])(
+  "opens a notified %s answer, keeps its marker across remounts, and clears it on send",
+  async (length) => {
+    setup();
+    const base = baseProps();
+    const runId = RunId.make("notified-run");
+    const entries = [
+      ...Array.from({ length: 20 }, (_, i) =>
+        message(`Earlier ${i}\n\n${"line\n\n".repeat(8)}`, { role: "assistant" }, `earlier-${i}`),
+      ),
+      message("Question", { role: "user", runId }, "question"),
+      message("I will inspect it", { role: "assistant", runId }, "progress-note"),
+      work("tool", {
+        kind: "tool",
+        label: "Read",
+        detail: "Read the source",
+        status: "completed",
+        runId,
+      }),
+      message(
+        `Final answer starts here\n\n${"answer line\n\n".repeat(length === "long" ? 120 : 0)}`,
+        { role: "assistant", runId },
+        "final-answer",
+      ),
+    ];
+    const notification = {
+      environmentId: ENVIRONMENT_ID,
+      threadId: ThreadId.make("notified-thread"),
+      runId,
+      key: "notify-once",
+    };
+    await using screen = await renderElement(
+      <MessagesTimeline
+        {...base}
+        timelineEntries={entries}
+        liveFollowEnabled={false}
+        replyReadingRequest={notification}
+      />,
+    );
+    const viewport = base.listRef.current!.getScrollableNode()!;
+    await vi.waitFor(() => {
+      const row = screen.container.querySelector('[data-timeline-row-id="entry-final-answer"]')!;
+      expect(viewport.style.visibility).not.toBe("hidden");
+      expect(screen.container.querySelector("[data-reply-reading-marker]")).not.toBeNull();
+      expect(
+        Math.abs(row.getBoundingClientRect().top - viewport.getBoundingClientRect().top - 24),
+      ).toBeLessThanOrEqual(2);
+    });
+    await screen.rerender(<div />);
+    await screen.rerender(
+      <MessagesTimeline
+        {...base}
+        timelineEntries={entries}
+        liveFollowEnabled={false}
+        replyReadingRequest={notification}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect(screen.container.querySelector("[data-reply-reading-marker]")).not.toBeNull(),
+    );
+    await screen.rerender(
+      <MessagesTimeline
+        {...base}
+        timelineEntries={[...entries, message("Next question", { role: "user" }, "next-question")]}
+        liveFollowEnabled={false}
+        replyReadingRequest={notification}
+      />,
+    );
+    expect(screen.container.querySelector("[data-reply-reading-marker]")).toBeNull();
+    await screen.rerender(<div />);
+    await screen.rerender(
+      <MessagesTimeline
+        {...base}
+        timelineEntries={[...entries, message("Next question", { role: "user" }, "next-question")]}
+        liveFollowEnabled={false}
+        replyReadingRequest={notification}
+      />,
+    );
+    expect(screen.container.querySelector("[data-reply-reading-marker]")).toBeNull();
+  },
+);

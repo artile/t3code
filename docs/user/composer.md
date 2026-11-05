@@ -12,6 +12,15 @@ becomes an attachment when inserting it would exceed the message limit. On a
 hardware keyboard, use `Cmd+Shift+V` on Apple devices or `Ctrl+Shift+V` elsewhere
 to keep a large paste editable in the composer instead.
 
+## Keep your reading position
+
+Web and desktop keep the chat in place when you send a prompt or the agent writes.
+Use `Cmd+Down` on macOS or `Ctrl+Down` elsewhere to jump to the end once.
+To follow new text, turn on **Settings → Chat → Automatic scrolling**.
+
+A completion notification opens the start of that turn's final answer. An arrow
+marks it until you send another prompt. The marker survives a reload.
+
 ## Formatting
 
 The composer writes Markdown and shows it styled as you type. When your cursor
@@ -128,10 +137,10 @@ Leaving reasoning level or service tier unset uses the provider's own configurat
 
 ## Quote an assistant response
 
-On web and desktop, select text within one assistant response and choose
-**Cite in composer**. You can add a comment about the quote and write instructions
-around it. Text inside an inline HTML render can be quoted the same way, except in
-saved pages larger than 5 MiB.
+On web and desktop, select text within one assistant response. The comment field
+opens and takes focus. Type a comment and press Enter to save it in the composer;
+Escape cancels. Text inside an inline HTML render works the same way, except in
+saved pages larger than 5 MiB. You can write more instructions around the quote.
 
 Select the quote in a draft or sent message to return to its source. If the source
 is unavailable or has changed, the saved quote remains readable.

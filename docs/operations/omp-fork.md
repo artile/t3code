@@ -33,7 +33,7 @@ in Lineage. This is a task-lifecycle integration, not full OMP TUI parity.
 
 HTML citations use the existing Cite toolbar in the web and desktop clients.
 The original Android client remains compatible, but it does not gain this web
-selection toolbar. The Paseo auto-focused quote-comment popup is not included.
+selection toolbar. Selecting assistant or HTML text opens its citation comment field directly.
 
 ## Update from upstream
 
@@ -57,3 +57,11 @@ Stop only this fork's server, then start the new build after verification. Keep
 the upstream installation available until the new build passes a real OMP turn,
 a native child-task check, cancellation, resume, and the original Android client.
 Do not set up an automatic weekly merge until these checks can gate deployment.
+
+## Reading and shortcuts
+
+Automatic scrolling is off by default in this fork. Change it under Settings →
+Chat. The local fork settings bind `thread.previous` to `Cmd+Shift+Up` and
+`thread.next` to `Cmd+Shift+Down`. The source defaults for thread navigation stay
+upstream-compatible; these two bindings live in the fork data directory and
+survive a source update. `thread.scrollToEnd` defaults to `Cmd/Ctrl+Down`.
