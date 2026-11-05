@@ -1,0 +1,21 @@
+upstream = "https://github.com/pingdotgg/t3code"
+branch = "omp-nightly"
+nightly_tag = "v0.1.8-nightly.20261105.4218"
+nightly_commit = "337c5858c33bc7f8f6dfd391a2c279fa0f7e4d17"
+
+[[sources]]
+pr = 11791
+commit = "14ed34f4e21946819109d2cdf17186d89b4b6d1b"
+
+[[sources]]
+pr = 11973
+commit = "4f9419b72bb92bebc6669dd95f345e1ccdf4bced"
+includes = 11791
+
+[[sources]]
+pr = 17023
+commit = "69d78ebf3346ddf91080a9dd2d1558a9da697a4c"
+
+[[sources]]
+pr = 29218
+commit = "cee7ea2f4b9b1bbb2e33745ba2a4cc5ebd13ce8f"

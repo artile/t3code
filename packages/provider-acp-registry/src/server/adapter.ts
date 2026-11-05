@@ -67,6 +67,11 @@ const DEFAULT_ACP_REGISTRY_SETTINGS = Schema.decodeSync(AcpRegistrySettings)({})
 const isAcpRequestError = Schema.is(EffectAcpErrors.AcpRequestError);
 
 export interface AcpRegistryAdapterV2Options {
+  readonly driverKind?: ProviderDriverKind;
+  readonly nativeFlavor?: Partial<AcpAdapterV2Flavor>;
+  readonly settingsForRuntimePolicy?: (
+    policy: AcpAdapterV2RuntimeInput["runtimePolicy"],
+  ) => AcpRegistrySettings;
   readonly instanceId: Parameters<typeof makeAcpAdapterV2>[0]["instanceId"];
   readonly settings: AcpRegistrySettings;
   readonly environment: NodeJS.ProcessEnv;
@@ -210,7 +215,7 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
     : options;
   const copilotRouting = isCopilot ? makeCopilotSubagentRouting() : undefined;
   const flavor: AcpAdapterV2Flavor = {
-    driver: ACP_REGISTRY_PROVIDER,
+    driver: options.driverKind ?? ACP_REGISTRY_PROVIDER,
     // Cancelling a Copilot prompt also kills the background agents it started.
     capabilities: isCopilot
       ? {
@@ -258,7 +263,17 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
           extractSubagentUpdate: extractCopilotSubagentUpdate,
           restartRuntimeAfterPromptError: isCopilotLostSessionError,
         }),
-    makeRuntime: options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog),
+    makeRuntime:
+      options.makeRuntime ??
+      ((input) =>
+        makeAcpRegistryRuntime(
+          {
+            ...runtimeOptions,
+            settings:
+              options.settingsForRuntimePolicy?.(input.runtimePolicy) ?? runtimeOptions.settings,
+          },
+          catalog,
+        )(input)),
     ...(runtimeCoordinator === undefined
       ? {}
       : {
@@ -287,6 +302,7 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
             runtimeCoordinator.withForegroundStartup(startupKey, effect),
         }),
     ...(options.assertComplete === undefined ? {} : { assertComplete: options.assertComplete }),
+    ...options.nativeFlavor,
   };
   return yield* makeAcpAdapterV2({
     instanceId: options.instanceId,

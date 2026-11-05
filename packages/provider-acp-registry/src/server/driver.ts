@@ -179,6 +179,7 @@ function acpRegistrySnapshotReadiness(
 }
 
 interface SnapshotIdentity {
+  readonly driver?: ProviderDriverKind;
   readonly instanceId: ProviderInstance["instanceId"];
   readonly displayName: string | undefined;
   readonly accentColor: string | undefined;
@@ -206,7 +207,7 @@ function baseSnapshot(
         officialAcpRegistryIconUrlForAgentId(input.settings.agentId));
   return {
     instanceId: input.instanceId,
-    driver: DRIVER_KIND,
+    driver: input.driver ?? DRIVER_KIND,
     ...(input.displayName ? { displayName: input.displayName } : {}),
     ...(input.accentColor ? { accentColor: input.accentColor } : {}),
     ...(iconUrl ? { iconUrl } : {}),
@@ -473,15 +474,25 @@ export type AcpRegistryDriverEnv =
   | Digest.Digest
   | ProviderHost.ProviderHost;
 
-export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryDriverEnv> = {
-  driverKind: DRIVER_KIND,
+export interface AcpRegistryDriverOptions {
+  readonly driverKind?: ProviderDriverKind;
+  readonly displayName?: string;
+  readonly hasDefaultInstance?: boolean;
+  readonly defaultConfig?: () => AcpRegistrySettings;
+  readonly createAdapter?: typeof AcpRegistryAdapterV2Driver.create;
+}
+
+export const makeAcpRegistryDriver = (
+  options: AcpRegistryDriverOptions = {},
+): ProviderDriver<AcpRegistrySettings, AcpRegistryDriverEnv> => ({
+  driverKind: options.driverKind ?? DRIVER_KIND,
   metadata: {
-    displayName: "ACP Registry",
+    displayName: options.displayName ?? "ACP Registry",
     supportsMultipleInstances: true,
-    hasDefaultInstance: false,
+    hasDefaultInstance: options.hasDefaultInstance ?? false,
   },
   configSchema: AcpRegistrySettings,
-  defaultConfig: () => decodeSettings({}),
+  defaultConfig: options.defaultConfig ?? (() => decodeSettings({})),
   create: Effect.fn("AcpRegistryDriver.create")(function* ({
     instanceId,
     displayName,
@@ -490,6 +501,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     enabled,
     config,
   }) {
+    const DRIVER_KIND = options.driverKind ?? ProviderDriverKind.make("acpRegistry");
     const catalog = yield* AcpRegistrySupport.AcpRegistryCatalog;
     const runtimeCoordinator = yield* Effect.serviceOption(
       AcpRegistryRuntimeCoordinator.AcpRegistryRuntimeCoordinator,
@@ -512,6 +524,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       instanceId,
     });
     const identity = {
+      driver: DRIVER_KIND,
       instanceId,
       displayName,
       accentColor,
@@ -522,7 +535,9 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       environment,
       hostEnvironment,
     );
-    const orchestrationAdapter = yield* AcpRegistryAdapterV2Driver.create({
+    const orchestrationAdapter = yield* (
+      options.createAdapter ?? AcpRegistryAdapterV2Driver.create
+    )({
       instanceId,
       displayName,
       accentColor,
@@ -921,4 +936,6 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       },
     } satisfies ProviderInstance;
   }),
-};
+});
+
+export const AcpRegistryDriver = makeAcpRegistryDriver();
