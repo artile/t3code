@@ -14,8 +14,14 @@ Use the Node and pnpm versions in `package.json`.
 ```sh
 pnpm install --frozen-lockfile
 pnpm fork:build
-pnpm fork:start
+pnpm fork:service install
 ```
+
+On macOS, the service runs at login and restarts after a failure. It starts Node
+directly and writes stdout and stderr to `.t3/service/`, so an agent terminal or
+RTK output pipe does not own its lifetime. Use `pnpm fork:service status`,
+`stop`, `start`, or `restart`. `uninstall` removes only this fork's LaunchAgent.
+For a foreground debug session, stop the service and use `pnpm fork:start`.
 
 The built server uses this checkout's `.t3` directory, port 13773, and HTTPS
 Tailscale Serve port 5733. The startup prints a pairing URL. Add it as a separate
@@ -53,7 +59,8 @@ The check fetches the newest published nightly tag. Apply requires a clean
 published history, and commits the new pin. A conflict stops the update. Resolve
 it, or use `git merge --abort`; the running built server is not replaced.
 
-Stop only this fork's server, then start the new build after verification. Keep
+Stop this fork with `pnpm fork:service stop` before building. After verification,
+use `pnpm fork:service start`. Keep
 the upstream installation available until the new build passes a real OMP turn,
 a native child-task check, cancellation, resume, and the original Android client.
 Do not set up an automatic weekly merge until these checks can gate deployment.
