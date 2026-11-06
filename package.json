@@ -61,7 +61,8 @@
     "fork:update": "node scripts/omp-fork-update.mjs",
     "fork:dev": "node scripts/omp-fork-dev.mjs",
     "fork:build": "vp run --filter t3 build:bundle && vp run --filter @t3tools/web build && node scripts/omp-fork-package.mjs",
-    "fork:start": "node scripts/omp-fork-start.mjs"
+    "fork:start": "node scripts/omp-fork-start.mjs",
+    "fork:service": "node scripts/omp-fork-service.mjs"
   },
   "devDependencies": {
     "@coderabbitai/config": "1.2.0",
