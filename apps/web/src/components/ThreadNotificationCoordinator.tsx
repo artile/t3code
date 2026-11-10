@@ -1,3 +1,4 @@
+import { isThreadWorking, WORKING_EXIT_GRACE_MS } from "@t3tools/client-runtime/state/thread-inbox";
 import { randomUUID } from "../lib/utils";
 import {
   type EnvironmentThreadShell,
@@ -323,7 +324,21 @@ export function startThreadNotifications(
       unsubscribe: () => {},
       gate: createThreadNotificationGate<ThreadId>((threadId, kind) => {
         const state = entry.previous.get(threadId);
-        if (state) present(environmentId, state, kind);
+        if (!state) return;
+        if (kind !== "completion") {
+          present(environmentId, state, kind);
+          return;
+        }
+        // Fork: the sidebar keeps a finished thread under Working for the exit grace.
+        // Play the completion only when it really leaves Working, and drop it when a
+        // continuation run starts inside the grace, so sound and Done stay in step.
+        const completedAt = state.completedAt;
+        setTimeout(() => {
+          const latest = entry.previous.get(threadId);
+          if (!latest || !latest.settled || latest.completedAt !== completedAt) return;
+          if (isThreadWorking(latest.thread)) return;
+          present(environmentId, latest, kind);
+        }, WORKING_EXIT_GRACE_MS);
       }),
     };
     let threads: ReadonlyArray<OrchestrationV2ThreadShell> | null = null;
