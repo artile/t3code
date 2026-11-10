@@ -48,6 +48,14 @@ function finalReplyRow(rows: ReadonlyArray<MessagesTimelineRow>, runId: RunId) {
   );
 }
 
+/** The first row after the user message that started the run: the top of the reply. */
+function replyStartRow(rows: ReadonlyArray<MessagesTimelineRow>, runId: RunId) {
+  const start = rows.findIndex(
+    (row) => row.kind === "message" && row.message.role === "user" && row.message.runId === runId,
+  );
+  return start >= 0 ? rows[start + 1] : undefined;
+}
+
 export function useReplyReading({
   identity,
   request,
@@ -76,7 +84,8 @@ export function useReplyReading({
   if (markerExpired && visit.identity === identity) setVisit({ ...visit, marker: null });
   const pending = request !== null && visit.handled !== request.key;
   const target = request ? finalReplyRow(rows, request.runId) : undefined;
-  const targetId = target?.id;
+  // Fork: open the reply at its start, not at its last message, so the reader reads top-down.
+  const targetId = request ? (replyStartRow(rows, request.runId)?.id ?? target?.id) : undefined;
   const targetMessageId = target?.kind === "message" ? target.message.id : null;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- persists the notification reading marker across a browser reload

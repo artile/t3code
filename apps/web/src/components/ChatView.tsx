@@ -1,3 +1,4 @@
+import type { ReplyReadingRequest } from "./chat/useReplyReading";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -568,10 +569,15 @@ export default function ChatView(props: ChatViewProps) {
   // re-renders ChatView on unrelated navigation state changes.
   const citationHref = useLocation({ select: (location) => location.href });
   const notifiedReply = useLocation({ select: (location) => location.state.notifiedReply });
+  // Fork: when a run finishes while this thread is open, open its reply at the top.
+  const [autoReply, setAutoReply] = useState<ReplyReadingRequest | null>(null);
+  const runningRunRef = useRef<string | null>(null);
   const replyReadingRequest =
     notifiedReply?.environmentId === environmentId && notifiedReply.threadId === threadId
       ? notifiedReply
-      : null;
+      : autoReply?.environmentId === environmentId && autoReply.threadId === threadId
+        ? autoReply
+        : null;
   const citationKey = useLocation({
     select: (location) => location.state.assistantCitationActivation ?? location.state.__TSR_key,
   });
@@ -1105,6 +1111,24 @@ export default function ChatView(props: ChatViewProps) {
   const [chatCanvasStore] = useState(createChatCanvasStore);
 
   const latestRunSettled = isLatestRunSettled(activeLatestRun, activeRuntime);
+  const autoRunId = activeLatestRun?.runId ?? null;
+  const autoRunStatus = activeLatestRun?.status ?? null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a run that finishes while the thread is open opens its reply at the top
+  useEffect(() => {
+    if (autoRunId === null) return;
+    if (autoRunStatus !== "completed") {
+      runningRunRef.current = autoRunId;
+      return;
+    }
+    if (runningRunRef.current !== autoRunId) return;
+    runningRunRef.current = null;
+    setAutoReply({
+      environmentId,
+      threadId,
+      runId: autoRunId,
+      key: `auto:${autoRunId}`,
+    } as ReplyReadingRequest);
+  }, [autoRunId, autoRunStatus, environmentId, threadId]);
   const activeThreadEnvironmentId = activeThread?.environmentId;
   const activeThreadProjectId = activeThread?.projectId;
   const activeProjectRef =
